@@ -19,6 +19,7 @@ class LinkedInAPI(object):
         self.api_comment_feed_url = 'http://api.linkedin.com/v1/people/~/network/updates/' + \
                                         'key={NETWORK UPDATE KEY}/update-comments'
         self.api_update_status_url = 'http://api.linkedin.com/v1/people/~/current-status'
+        self.api_share_url = 'http://api.linkedin.com/v1/people/~/shares'
         self.api_mailbox_url = 'http://api.linkedin.com/v1/people/~/mailbox'
         
         self.base_url = 'https://api.linkedin.com'
@@ -148,8 +149,10 @@ class LinkedInAPI(object):
         resp, content = client.request(url, method='POST', body=xml_request, headers={'Content-Type': 'application/xml'})
         return content
     
-    def set_status_update(self, access_token, bd):
+    def set_status_update(self, access_token, bd): 
         """
+        Note: This method is now deprecated.
+        
         Set the status for the current user.  The status update body is the last
         positional argument.  NOTE: The XML will be applied to the status update
         for you.
@@ -160,6 +163,56 @@ class LinkedInAPI(object):
         user_token, url = self.prepare_request(access_token, self.api_update_status_url)
         client = oauth.Client(self.consumer, user_token)
         resp, content = client.request(url, method='PUT', body=xml_request)
+        return content
+    
+    def share(self, access_token, data):
+        """
+        Use the LinkedIn Shares API to add a new share, you markup the content in XML and 
+        issue a HTTP POST to the url. See https://developer.linkedin.com/documents/share-api
+        
+        data: is a dictionary containing the following keys:
+            comment             : Text of member's comment. (Similar to deprecated current-status field.) Max length is 700 characters.
+            visibility          : Parent node for visibility information. Can be either 'connections-only' or 'anyone'
+            title               : The title of the content submitted. Max length is 200 characters.
+            submitted-url       : URL of the content submitted
+            submitted-image-url : URL to the image, accompanying the content
+            description         : Description of shared content. Max length of 400 characters.
+            id                  : id of reshared document, currently in the format of s12345678, so is not guaranteed to be an integer.
+            
+        Example usage:
+            data = {
+                'comment':  '83 percent of employers will use social media to hire: 78p LinkedIn, 55p Facebook, 45p Twitter [SF Biz Times]',
+                'title': 'Survey: Social networks top hiring tool - San Francisco Business Times',
+                'submitted-url': 'http://sanfrancisco.bizjournals.com/sanfrancisco/stories/2010/06/28/daily34.html',
+                'submitted-image-url': 'http://images.bizjournals.com/travel/cityscapes/thumbs/sm_sanfrancisco.jpg',
+                'description': "A survey by Burlingame's Jobvite Inc.  shows 83 percent of employers are likely to use social networks like Facebook and LinkedIn for hiring in the next year.",
+                'visibility' : 'anyone'
+            }
+            api.share(access_token, data=data)
+        """
+        title = data.get('title')
+        submitted_url = data.get('submitted-url')
+        submitted_image_url = data.get('submitted-image-url')
+        description = data.get('description')
+        data['visibility'] = data.get('visibility') or 'anyone'
+        
+        bd_start = '<?xml version="1.0" encoding="UTF-8"?>'
+        bd_share_start = bd_start + '<share>'
+        bd_comment = bd_share_start + '<comment>%(comment)s</comment>'
+        if title:
+            bd_content_start = bd_comment + '<content>'
+            bd_content_title = bd_content_start + '<title>%(title)s</title>'
+            if submitted_url:
+                bd_content_title = bd_content_title + '<submitted-url>%(submitted-url)s</submitted-url>'
+            if submitted_image_url:
+                bd_content_title = bd_content_title + '<submitted-image-url>%(submitted-image-url)s</submitted-image-url>'
+            bd_comment = bd_content_title + '<description>%(description)s</description></content>'
+        bd_share_end = bd_comment + '<visibility><code>%(visibility)s</code></visibility></share>'
+        
+        xml_request = bd_share_end % data
+        user_token, url = self.prepare_request(access_token, self.api_share_url)
+        client = oauth.Client(self.consumer, user_token)
+        resp, content = client.request(url, method='POST', body=xml_request, headers={'Content-Type': 'application/xml'})
         return content
     
     def search(self, access_token, data, field_selector_string=None):
