@@ -94,6 +94,8 @@ class LinkedInAPI(object):
         """
         if selectors:
             url = self.prepare_field_selectors(selectors, self.api_profile_connections_url)
+        else:
+            url = self.api_profile_connections_url
         user_token, url = self.prepare_request(access_token, url, kwargs)
         client = oauth.Client(self.consumer, user_token)
         resp, content = client.request(url, 'GET')
